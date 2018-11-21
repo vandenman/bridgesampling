@@ -217,7 +217,7 @@
 
 .run.iterative.scheme <- function(q11, q12, q21, q22, r0, tol, L,
                                   method, maxiter, silent,
-                                  criterion, neff) {
+                                  criterion, neff, useBrob = FALSE) {
 
   ### run iterative updating scheme (using "optimal" bridge function,
   ### see Meng & Wong, 1996)
@@ -241,32 +241,79 @@
   logml_vals <-  logml
   criterion_val <- 1 + tol
 
-  e <- as.brob( exp(1) )
   i <- 1
+  if (useBrob) {
+    e <- as.brob( exp(1) )
 
-  while (i <= maxiter && criterion_val > tol) {
+    while (i <= maxiter && criterion_val > tol) {
 
-    if (! silent)
-      cat(paste0("Iteration: ", i, "\n"))
+      if (! silent)
+        cat(paste0("Iteration: ", i, "\n"))
 
-    rold <- r
-    logmlold <- logml
-    numi <- as.numeric( e^(l2 - lstar)/(s1 * e^(l2 - lstar) + s2 *  r) )
-    deni <- as.numeric( 1/(s1 * e^(l1 - lstar) + s2 * r) )
+      rold <- r
+      logmlold <- logml
+      numi <- as.numeric( e^(l2 - lstar)/(s1 * e^(l2 - lstar) + s2 *  r) )
+      deni <- as.numeric( 1/(s1 * e^(l1 - lstar) + s2 * r) )
 
-    if (any(is.infinite(numi)) || any(is.infinite(deni))) {
-      warning("Infinite value in iterative scheme, returning NA.\n Try rerunning with more samples.", call. = FALSE)
-      return(list(logml = NA, niter = i))
+      if (any(is.infinite(numi)) || any(is.infinite(deni))) {
+        warning("Infinite value in iterative scheme, returning NA.\n Try rerunning with more samples.", call. = FALSE)
+        return(list(logml = NA, niter = i))
+
+      }
+
+      r <- (n.1/n.2) * sum(numi)/sum(deni)
+      r_vals <- c(r_vals, r)
+      logml <- log(r) + lstar
+      logml_vals <- c(logml_vals, logml)
+      criterion_val <- switch(criterion, "r" = abs((r - rold)/r),
+                              "logml" = abs((logml - logmlold)/logml))
+      i <- i + 1
 
     }
+  } else {
 
-    r <- (n.1/n.2) * sum(numi)/sum(deni)
-    r_vals <- c(r_vals, r)
-    logml <- log(r) + lstar
-    logml_vals <- c(logml_vals, logml)
-    criterion_val <- switch(criterion, "r" = abs((r - rold)/r),
-                            "logml" = abs((logml - logmlold)/logml))
-    i <- i + 1
+    # choose some constant to avoid overflow and minimize underflow.
+    # b <- max(l2 - lstar)
+    # a <- min(l2 - lstar)
+    # d <- min(l1 - lstar)
+    # browser()
+    b <- findOptimalValue(l2 - lstar, "overflow")
+    a <- findOptimalValue(l2 - lstar, "underflow")
+    d <- findOptimalValue(l1 - lstar, "underflow")
+
+    e_l1_d <- Brobdingnag::brob(l1 - lstar + d)
+    e_l2_b <- Brobdingnag::brob(l2 - lstar + b)
+    e_l2_a <- Brobdingnag::brob(l2 - lstar + a)
+
+    while (i <= maxiter && criterion_val > tol) {
+
+      if (!silent)
+        cat(paste0("Iteration: ", i, "\n"))
+
+      rold <- r
+      logmlold <- logml
+      logNumi <- a - b + log(sum(e_l2_b / (s1 * e_l2_a + s2 * Brobdingnag::brob(r + a))))
+      logDeni <- d +     log(sum(1      / (s1 * e_l1_d + s2 * Brobdingnag::brob(r + d))))
+      if (is.infinite(logNumi) || is.infinite(logDeni))
+        browser()
+      r <- log(n.1) - log(n.2) + logNumi - logDeni
+
+      if (is.infinite(r)) {
+        warning("Infinite value in iterative scheme, returning NA.\n Try rerunning with more samples.", call. = FALSE)
+        return(list(logml = NA, niter = i))
+      }
+
+      r_vals <- c(r_vals, exp(r))
+      logml <- r + lstar
+      logml_vals <- c(logml_vals, logml)
+      criterion_val <- switch(
+        criterion,
+        "r" = abs(1 - exp(rold - r)), #abs((exp(r) - exp(rold))/exp(r)),
+        "logml" = abs((logml - logmlold)/logml)
+      )
+      i <- i + 1
+
+    }
 
   }
 
@@ -276,4 +323,41 @@
 
   return(list(logml = logml, niter = i-1))
 
+}
+
+findOptimalValue <- function(x, avoid = c("overflow", "underflow")) {
+
+  # assumes sumlogexp is implemented like this:
+  # y <- sum(log(exp(x)))
+  # y <- sum(log(exp(x + a))) - a
+  avoid <- match.arg(avoid)
+  emax  <- .Machine$double.max.exp * log(2) # e^this overflows
+  emin  <- .Machine$double.min.exp * log(2) # e^this underflows
+
+  r <- range(x)
+  if (avoid == "overflow") {
+    if (r[2] > emax) {
+      return(-r[2])
+    } else {
+      m <- median(x)
+      incmax <- abs(r[2] - 1.001*emax)
+      if (m < incmax) {
+        return(-m)
+      } else {
+        return(-incmax)
+      }
+    }
+  } else {
+    if (r[1] < emin) {
+      return(-r[1])
+    } else {
+      m <- median(x)
+      incmax <- abs(r[1] - 1.001*emin)
+      if (m < incmax) {
+        return(-m)
+      } else {
+        return(-incmax)
+      }
+    }
+  }
 }

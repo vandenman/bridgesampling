@@ -191,7 +191,7 @@ bridge_sampler <- function(samples, ...) {
 bridge_sampler.stanfit <- function(samples = NULL, stanfit_model = samples,
                                    repetitions = 1, method = "normal", cores = 1,
                                    use_neff = TRUE, maxiter = 1000, silent = FALSE,
-                                   verbose = FALSE, ...) {
+                                   verbose = FALSE, useBrob = FALSE, ...) {
 
   # convert samples into matrix
   if (!requireNamespace("rstan")) stop("package rstan required")
@@ -261,7 +261,7 @@ bridge_sampler.stanfit <- function(samples = NULL, stanfit_model = samples,
                                          repetitions = repetitions, cores = cores,
                                          packages = "rstan", maxiter = maxiter, silent = silent,
                                          verbose = verbose,
-                                         r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4))
+                                         r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4, useBrob = useBrob))
   } else {
     bridge_output <- do.call(what = paste0(".bridge.sampler.", method),
                              args = list(samples_4_fit = samples_4_fit,
@@ -276,7 +276,7 @@ bridge_sampler.stanfit <- function(samples = NULL, stanfit_model = samples,
                                          envir = sys.frame(sys.nframe()),
                                          cores = cores, packages = "rstan", maxiter = maxiter,
                                          silent = silent, verbose = verbose,
-                                         r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4))
+                                         r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4, useBrob = useBrob))
   }
 
   return(bridge_output)
@@ -291,7 +291,7 @@ bridge_sampler.mcmc.list <- function(samples = NULL, log_posterior = NULL, ..., 
                                      method = "normal", cores = 1, use_neff = TRUE,
                                      packages = NULL, varlist = NULL, envir = .GlobalEnv,
                                      rcppFile = NULL, maxiter = 1000, silent = FALSE,
-                                     verbose = FALSE) {
+                                     verbose = FALSE, useBrob = FALSE) {
   # split samples in two parts
   nr <- nrow(samples[[1]])
   samples4fit_index <- seq_len(nr) %in% seq_len(round(nr/2))
@@ -343,7 +343,7 @@ bridge_sampler.mcmc.list <- function(samples = NULL, log_posterior = NULL, ..., 
                              param_types = param_types,
                              rcppFile = rcppFile, maxiter = maxiter,
                              silent = silent, verbose = verbose,
-                             r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4))
+                             r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4, useBrob = FALSE))
 
   return(out)
 
@@ -359,7 +359,7 @@ bridge_sampler.mcmc <- function(samples = NULL, log_posterior = NULL, ...,
                                 envir = .GlobalEnv, rcppFile = NULL,
                                 maxiter = 1000,
                                 param_types = rep("real", ncol(samples)),
-                                silent = FALSE, verbose = FALSE) {
+                                silent = FALSE, verbose = FALSE, useBrob = FALSE) {
   samples <- as.matrix(samples)
   bridge_output <- bridge_sampler(samples = samples,
                                   log_posterior = log_posterior,
@@ -372,7 +372,7 @@ bridge_sampler.mcmc <- function(samples = NULL, log_posterior = NULL, ...,
                                   envir = envir, rcppFile = rcppFile,
                                   maxiter = maxiter,
                                   param_types = param_types,
-                                  silent = silent, verbose = verbose)
+                                  silent = silent, verbose = verbose, useBrob = useBrob)
   return(bridge_output)
 }
 
@@ -386,7 +386,7 @@ bridge_sampler.matrix <- function(samples = NULL, log_posterior = NULL, ...,
                                 envir = .GlobalEnv, rcppFile = NULL,
                                 maxiter = 1000,
                                 param_types = rep("real", ncol(samples)),
-                                silent = FALSE, verbose = FALSE) {
+                                silent = FALSE, verbose = FALSE, useBrob = FALSE) {
 
   # see Meng & Wong (1996), equation 4.1
 
@@ -444,7 +444,7 @@ bridge_sampler.matrix <- function(samples = NULL, log_posterior = NULL, ...,
                              packages = packages, varlist = varlist, envir = envir,
                              rcppFile = rcppFile, maxiter = maxiter,
                              silent = silent, verbose = verbose,
-                             r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4))
+                             r0 = 0.5, tol1 = 1e-10, tol2 = 1e-4, useBrob = useBrob))
   return(out)
 
 }
@@ -488,7 +488,7 @@ bridge_sampler.stanreg <-
                                       repetitions = repetitions, method = method, cores = cores,
                                       use_neff = use_neff, packages = "rstan",
                                       maxiter = maxiter, silent = silent,
-                                      verbose = verbose)
+                                      verbose = verbose, useBrob = useBrob)
     } else {
       bridge_output <- bridge_sampler(samples = samples,
                                       log_posterior = .stan_log_posterior,
@@ -497,7 +497,7 @@ bridge_sampler.stanreg <-
                                       envir = sys.frame(sys.nframe()), method = method,
                                       cores = cores, use_neff = use_neff,
                                       packages = "rstan", maxiter = maxiter,
-                                      silent = silent, verbose = verbose)
+                                      silent = silent, verbose = verbose, useBrob = useBrob)
     }
     return(bridge_output)
 }
@@ -509,7 +509,7 @@ bridge_sampler.rjags <- function(samples = NULL, log_posterior = NULL, ..., data
                                  method = "normal", cores = 1, use_neff = TRUE,
                                  packages = NULL, varlist = NULL,
                                  envir = .GlobalEnv, rcppFile = NULL,
-                                 maxiter = 1000, silent = FALSE, verbose = FALSE) {
+                                 maxiter = 1000, silent = FALSE, verbose = FALSE, useBrob = FALSE) {
 
 
   # convert to mcmc.list
@@ -523,7 +523,7 @@ bridge_sampler.rjags <- function(samples = NULL, log_posterior = NULL, ..., data
                         method = method, cores = cores, use_neff = use_neff,
                         packages = packages, varlist = varlist, envir = envir,
                         rcppFile = rcppFile, maxiter = maxiter, silent = silent,
-                        verbose = verbose)
+                        verbose = verbose, useBrob = useBrob)
 
   return(out)
 
@@ -536,7 +536,7 @@ bridge_sampler.runjags <- function(samples = NULL, log_posterior = NULL, ..., da
                                    method = "normal", cores = 1, use_neff = TRUE,
                                    packages = NULL, varlist = NULL,
                                    envir = .GlobalEnv, rcppFile = NULL,
-                                   maxiter = 1000, silent = FALSE, verbose = FALSE) {
+                                   maxiter = 1000, silent = FALSE, verbose = FALSE, useBrob = FALSE) {
 
 
   # convert to mcmc.list
@@ -564,6 +564,7 @@ bridge_sampler.MCMC_refClass <- function(samples,
                                   maxiter = 1000,
                                   silent = FALSE,
                                   verbose = FALSE,
+                                  useBrob = FALSE,
                                   ...) {
   if (!requireNamespace("nimble")) stop("package nimble required")
 
@@ -659,7 +660,7 @@ bridge_sampler.MCMC_refClass <- function(samples,
                         packages = "nimble",
                         maxiter = maxiter,
                         silent = silent,
-                        verbose = verbose)
+                        verbose = verbose, useBrob = useBrob)
 
   return(out)
 
